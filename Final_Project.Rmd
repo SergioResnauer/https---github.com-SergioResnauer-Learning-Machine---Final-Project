@@ -1,0 +1,100 @@
+---
+title: "Machine Learning - Final Project"
+author: "Sergio L. Resnauer"
+date: "09/10/2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+#### Data
+
+The training data for this project are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+
+The data for this project come from this source: http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har. If you use the document you create for this class for any purpose please cite them as they have been very generous in allowing their data to be used for this kind of assignment.
+
+#### Goal
+
+The goal of your project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. You may use any of the other variables to predict with. You should create a report describing how you built your model, how you used cross validation, what you think the expected out of sample error is, and why you made the choices you did. You will also use your prediction model to predict 20 different test cases.
+
+### Getting and Reading Data
+
+```{r GetData}
+library(rpart)
+library(rpart.plot)
+library(RColorBrewer)
+library(randomForest)
+library(caret)
+library(stats)
+set.seed(2017)
+
+trainDataUrl <- "http://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+testDataUrl <- "http://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+
+trainingData <- read.csv(url(trainDataUrl), na.strings=c("NA","#DIV/0!",""))
+testingData <- read.csv(url(testDataUrl), na.strings=c("NA","#DIV/0!",""))
+dim(trainingData)
+dim(testingData)
+```
+
+### Cleaning Data
+
+Removing NA values and the seven first columns:
+
+```{r cleaningData1}
+trainingData <- trainingData[, -c(1:7)]
+testingData <- testingData[, -c(1:7)]
+trainingDataClean <- trainingData[, colSums(is.na(trainingData)) == 0]
+testingDataClean <- testingData[, colSums(is.na(testingData)) == 0]
+inTraining <- createDataPartition(trainingDataClean$classe, p = 0.75, list = FALSE)
+```
+We'll split the trainingDataClean set of values in  myTraining and myTesting, respectivaly in training set and validation set.
+```{r cleaningData2}
+myTraining <- trainingDataClean[inTraining, ]
+myTesting <- trainingDataClean[-inTraining, ]
+```
+
+### Prediction
+
+We'll use prediction tree.
+```{r prediction}
+modelFitTree <- rpart(classe ~ ., data=myTraining, method="class")
+predictionsA1 <- predict(modelFitTree, myTesting, type = "class")
+confusionMatrix(predictionsA1, myTesting$classe)
+confusionMatrix(predictionsA1, myTesting$classe)$overall[1]
+```
+
+### Prediction - Random Forest
+```{r forrest}
+modFitRF <- randomForest(classe ~ ., data=myTraining)
+predictionRF <- predict(modFitRF, myTesting, type = "class")
+cmrf <- confusionMatrix(predictionRF, myTesting$classe)
+cmrf
+cmrf$overall[1]
+plot(modFitRF)
+```
+
+The Random Forest Prediction gave us the accuracy of .9949.
+
+### Test Set Predictions
+
+```{r analysisPrediction}
+dataControl <- trainControl(method="cv", number=3, verboseIter=F)
+result <- train(classe ~ ., data=trainingDataClean, method="rf", trControl=dataControl)
+validationPredict <- predict(result, newdata=testingData)
+resultPredicValid <- data.frame(problem_id=testingData$problem_id, predicted=validationPredict)
+print(resultPredicValid)
+```
